@@ -26,7 +26,7 @@ the bot will:
 - `bot/planner.py`: Generates plans from goals
 - `bot/runner.py`: Executes planned actions safely
 - `bot/memory.py`: Stores past runs and learnings
-- `bot/llm.py`: Optional OpenAI-backed reasoning layer with fallback mode
+- `bot/llm.py`: Optional OpenAI/Ollama reasoning layer with fallback mode
 
 ## Quick start
 
@@ -40,7 +40,22 @@ python3 main.py "Create a simple Flask app skeleton"
 
 ```bash
 export OPENAI_API_KEY="your_key"
-python3 main.py "Create a Python package with tests" --use-llm
+python3 main.py "Create a Python package with tests" --use-llm --provider openai
+```
+
+### 3) Run with Ollama (free local model)
+
+1. Install and start Ollama.
+2. Pull a model (example):
+
+```bash
+ollama pull llama3.2:3b
+```
+
+3. Run:
+
+```bash
+python3 main.py "Create a Python package with tests" --use-llm --provider ollama
 ```
 
 ## Options
@@ -49,12 +64,17 @@ python3 main.py "Create a Python package with tests" --use-llm
 python3 main.py "your goal" \
   --workspace ./generated \
   --iterations 3 \
-  --use-llm
+  --use-llm \
+  --provider ollama \
+  --ollama-model llama3.2:3b
 ```
 
 - `--workspace`: where generated files go
 - `--iterations`: number of think/build/review loops
-- `--use-llm`: uses OpenAI if `OPENAI_API_KEY` is set
+- `--use-llm`: enables LLM planning
+- `--provider`: `auto`, `openai`, or `ollama`
+- `--ollama-model`: local model name for Ollama
+- `--ollama-base-url`: Ollama API URL (default `http://127.0.0.1:11434`)
 
 ## Safety
 

@@ -6,8 +6,19 @@ from .llm import LLMReasoner
 
 
 class Planner:
-    def __init__(self, use_llm: bool = False) -> None:
-        self.reasoner = LLMReasoner(enabled=use_llm)
+    def __init__(
+        self,
+        use_llm: bool = False,
+        provider: str = "auto",
+        ollama_model: str = "llama3.2:3b",
+        ollama_base_url: str = "http://127.0.0.1:11434",
+    ) -> None:
+        self.reasoner = LLMReasoner(
+            enabled=use_llm,
+            provider=provider,
+            ollama_model=ollama_model,
+            ollama_base_url=ollama_base_url,
+        )
 
     def build_plan(self, goal: str, previous_critique: str = "") -> List[Dict[str, Any]]:
         result = self.reasoner.think(goal, previous_critique)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib import error, request
 from typing import Any, Dict, List
 
 
@@ -13,33 +14,109 @@ SYSTEM_PROMPT = (
 
 
 class LLMReasoner:
-    def __init__(self, enabled: bool = False) -> None:
-        self.enabled = enabled and bool(os.getenv("OPENAI_API_KEY"))
+    def __init__(
+        self,
+        enabled: bool = False,
+        provider: str = "auto",
+        ollama_model: str = "llama3.2:3b",
+        ollama_base_url: str = "http://127.0.0.1:11434",
+    ) -> None:
+        self.enabled = enabled
+        self.provider = provider
+        self.ollama_model = ollama_model
+        self.ollama_base_url = ollama_base_url.rstrip("/")
 
     def think(self, goal: str, previous_critique: str = "") -> Dict[str, Any]:
         if not self.enabled:
             return self._fallback(goal, previous_critique)
 
         try:
-            from openai import OpenAI  # type: ignore
-
-            client = OpenAI()
-            user_prompt = (
-                f"Goal: {goal}\n"
-                f"Previous critique: {previous_critique or 'None'}\n"
-                "Generate a concise plan with 2-5 create_file actions."
-            )
-            resp = client.responses.create(
-                model="gpt-4.1-mini",
-                input=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-            text = resp.output_text.strip()
-            return json.loads(text)
+            response = self._think_with_provider(goal, previous_critique)
+            if self._is_valid_response(response):
+                return response
         except Exception:
-            return self._fallback(goal, previous_critique)
+            pass
+        return self._fallback(goal, previous_critique)
+
+    def _think_with_provider(
+        self, goal: str, previous_critique: str = ""
+    ) -> Dict[str, Any]:
+        if self.provider == "openai":
+            return self._think_openai(goal, previous_critique)
+        if self.provider == "ollama":
+            return self._think_ollama(goal, previous_critique)
+        if self.provider == "auto":
+            if os.getenv("OPENAI_API_KEY"):
+                try:
+                    return self._think_openai(goal, previous_critique)
+                except Exception:
+                    return self._think_ollama(goal, previous_critique)
+            return self._think_ollama(goal, previous_critique)
+        raise ValueError(f"Unknown provider: {self.provider}")
+
+    def _think_openai(self, goal: str, previous_critique: str = "") -> Dict[str, Any]:
+        from openai import OpenAI  # type: ignore
+
+        client = OpenAI()
+        user_prompt = (
+            f"Goal: {goal}\n"
+            f"Previous critique: {previous_critique or 'None'}\n"
+            "Generate a concise plan with 2-5 create_file actions."
+        )
+        resp = client.responses.create(
+            model="gpt-4.1-mini",
+            input=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        text = resp.output_text.strip()
+        return self._parse_json_text(text)
+
+    def _think_ollama(self, goal: str, previous_critique: str = "") -> Dict[str, Any]:
+        prompt = (
+            f"{SYSTEM_PROMPT}\n\n"
+            f"Goal: {goal}\n"
+            f"Previous critique: {previous_critique or 'None'}\n"
+            "Generate a concise plan with 2-5 create_file actions."
+        )
+        payload = {
+            "model": self.ollama_model,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+        }
+        req = request.Request(
+            url=f"{self.ollama_base_url}/api/generate",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=45) as resp:
+                body = resp.read().decode("utf-8")
+        except error.URLError as exc:
+            raise RuntimeError("Could not reach Ollama API.") from exc
+
+        parsed = json.loads(body)
+        text = str(parsed.get("response", "")).strip()
+        return self._parse_json_text(text)
+
+    def _parse_json_text(self, text: str) -> Dict[str, Any]:
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise
+            return json.loads(text[start : end + 1])
+
+    def _is_valid_response(self, response: Dict[str, Any]) -> bool:
+        plan = response.get("plan")
+        if not isinstance(plan, list):
+            return False
+        return all(isinstance(item, dict) and "action" in item for item in plan)
 
     def _fallback(self, goal: str, previous_critique: str = "") -> Dict[str, Any]:
         idea = goal.lower()

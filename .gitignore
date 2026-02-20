@@ -4,3 +4,5 @@ __pycache__/
 .runs/
 
 generated/
+generated-ollama/
+.DS_Store

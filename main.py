@@ -8,8 +8,21 @@ from bot.planner import Planner
 from bot.runner import SafeRunner
 
 
-def run(goal: str, workspace: Path, iterations: int, use_llm: bool) -> None:
-    planner = Planner(use_llm=use_llm)
+def run(
+    goal: str,
+    workspace: Path,
+    iterations: int,
+    use_llm: bool,
+    provider: str,
+    ollama_model: str,
+    ollama_base_url: str,
+) -> None:
+    planner = Planner(
+        use_llm=use_llm,
+        provider=provider,
+        ollama_model=ollama_model,
+        ollama_base_url=ollama_base_url,
+    )
     runner = SafeRunner(workspace=workspace)
     memory = MemoryStore(base_dir=workspace / ".runs")
 
@@ -42,7 +55,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--use-llm",
         action="store_true",
-        help="Use OpenAI if OPENAI_API_KEY is configured",
+        help="Use LLM reasoning (OpenAI or local Ollama)",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "openai", "ollama"],
+        default="auto",
+        help="LLM provider: auto, openai, or ollama",
+    )
+    parser.add_argument(
+        "--ollama-model",
+        default="llama3.2:3b",
+        help="Ollama model name (used when provider is ollama/auto)",
+    )
+    parser.add_argument(
+        "--ollama-base-url",
+        default="http://127.0.0.1:11434",
+        help="Ollama API base URL",
     )
     return parser.parse_args()
 
@@ -54,4 +83,7 @@ if __name__ == "__main__":
         workspace=Path(args.workspace),
         iterations=max(1, args.iterations),
         use_llm=args.use_llm,
+        provider=args.provider,
+        ollama_model=args.ollama_model,
+        ollama_base_url=args.ollama_base_url,
     )
