@@ -76,6 +76,22 @@ python3 main.py "your goal" \
 - `--ollama-model`: local model name for Ollama
 - `--ollama-base-url`: Ollama API URL (default `http://127.0.0.1:11434`)
 
+## Run Without Your Laptop (GitHub Actions)
+
+This repo includes a workflow at `.github/workflows/run-autonomous-bot.yml` that can run:
+- manually (`Run workflow` button), and
+- daily on schedule (`13:00 UTC`).
+
+Steps:
+1. In GitHub, open this repo -> `Settings` -> `Secrets and variables` -> `Actions`.
+2. Add secret `OPENAI_API_KEY` (optional; needed only for OpenAI mode).
+3. Open `Actions` -> `Run Autonomous Creator Bot` -> `Run workflow`.
+4. Download output from workflow artifacts (`generated-output-*`).
+
+Notes:
+- GitHub Actions runners do not host local Ollama, so `provider=ollama` will fall back unless you run on a self-hosted runner with Ollama installed.
+- If you keep `use_llm=false`, it runs fully without paid APIs using fallback planning.
+
 ## Safety
 
 The runner only writes inside the specified workspace directory and prevents path traversal.

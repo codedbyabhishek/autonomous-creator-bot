@@ -1,0 +1,80 @@
+name: Run Autonomous Creator Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      goal:
+        description: "Goal for the bot"
+        required: false
+        default: "Create a simple starter project with README and runnable code"
+      iterations:
+        description: "Number of iterations"
+        required: false
+        default: "2"
+      use_llm:
+        description: "Enable LLM planning (requires OPENAI_API_KEY for openai provider)"
+        required: false
+        type: boolean
+        default: false
+      provider:
+        description: "LLM provider when use_llm is true"
+        required: false
+        type: choice
+        options:
+          - auto
+          - openai
+          - ollama
+        default: auto
+  schedule:
+    - cron: "0 13 * * *"
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      INPUT_GOAL: ${{ github.event.inputs.goal }}
+      INPUT_ITERATIONS: ${{ github.event.inputs.iterations }}
+      INPUT_USE_LLM: ${{ github.event.inputs.use_llm }}
+      INPUT_PROVIDER: ${{ github.event.inputs.provider }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project and optional OpenAI client
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install openai
+
+      - name: Run bot
+        run: |
+          GOAL="${INPUT_GOAL:-Create a simple starter project with README and runnable code}"
+          ITERATIONS="${INPUT_ITERATIONS:-2}"
+          USE_LLM="${INPUT_USE_LLM:-false}"
+          PROVIDER="${INPUT_PROVIDER:-auto}"
+
+          echo "Goal: ${GOAL}"
+          echo "Iterations: ${ITERATIONS}"
+          echo "use_llm: ${USE_LLM}"
+          echo "provider: ${PROVIDER}"
+
+          if [ "${USE_LLM}" = "true" ]; then
+            python main.py "${GOAL}" --workspace generated --iterations "${ITERATIONS}" --use-llm --provider "${PROVIDER}"
+          else
+            python main.py "${GOAL}" --workspace generated --iterations "${ITERATIONS}"
+          fi
+
+      - name: Upload generated output
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-output-${{ github.run_number }}
+          path: generated
+          if-no-files-found: error
